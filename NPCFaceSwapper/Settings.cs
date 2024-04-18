@@ -128,7 +128,7 @@ namespace NPCFaceSwapper
     {
         [MaintainOrder]
         [Tooltip("Generate voice files for gender changed/voice changed NPCs. Will use xVASynth, so the voices will sound computer generated, to some degree.\nLeave unchecked will leave some lines unvoiced, so you will need Fuz Ro Doh")]
-        public bool Generate_Voice_Files=false;
+        public bool Generate_Voice_CSV=false;
         [MaintainOrder]
         public List<string> additional_xvasynth_female_models = new();
         [MaintainOrder]

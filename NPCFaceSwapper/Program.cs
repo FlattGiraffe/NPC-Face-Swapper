@@ -301,7 +301,7 @@ namespace NPCFaceSwapper
 
 
             //voice gen. generate batch csv for use in xvasynth, user will have to use xvasynth on their own as there is no cli for it
-            if (Settings.Value.Voice_Settings.Generate_Voice_Files)
+            if (Settings.Value.Voice_Settings.Generate_Voice_CSV)
             {
                 Log("Creating xVaSynth CSV");
                 Generate_xVASynth_CSV(changed_voices);
