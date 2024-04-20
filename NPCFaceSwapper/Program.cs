@@ -10,6 +10,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using DynamicData;
 using System.Linq;
+using Synthesis.Bethesda;
 
 
 namespace NPCFaceSwapper
@@ -21,147 +22,109 @@ namespace NPCFaceSwapper
         static string log_path = "";
         static bool log_console_output = true;
         static bool log_file_output = true;
-        static Random rnd = new(Settings.Value.Random_Generation_Seed);
+        static Random rnd = new();
         static bool add_sexlab_kw = false;
         static string modsfolder = "";
         static IPatcherState<ISkyrimMod, ISkyrimModGetter>? state;
+        static Dictionary<string, List<FormKey>> race_groups = new();
+        static List<string> child_whitelist_words = new() { "child" };
+        static List<string> race_blacklist_words = new() { "draugr" };
 
-        static List<string> voices_xvasynth_female = new()
+
+        static Dictionary<string, string> xvasynth_model_names_male = new()
         {
-            "sk_astrid",
-            "sk_delphine",
-            "sk_elenwen",
-            "sk_femaleargonian",
-            "sk_femalecommander",
-            "sk_femalecommoner",
-            "sk_femalecondescending",
-            "sk_femalecoward",
-            "sk_femaledarkelf",
-            "sk_femaledarkelfcommander",
-            "sk_femaleelfhaughty",
-            "sk_femaleeventoned",
-            "sk_femalekhajiit",
-            "sk_femalenord",
-            "sk_femaleoldgrumpy",
-            "sk_femaleoldkindly",
-            "sk_femaleorc",
-            "sk_femaleshrill",
-            "sk_femalesultry",
-            "sk_femalevampire",
-            "sk_femaleyoungeager",
-            "sk_frea",
-            "sk_fura",
-            "sk_karliah",
-            "sk_maven",
-            "sk_mirabelleervine",
-            "sk_serana",
-            "sk_valerica",
-            "sk_vex"
-        };
-        static List<string> voices_xvasynth_male = new()
-        {
-            "sk_adril",
-            "sk_alduin",
-            "sk_ancano",
-            "sk_argeir",
-            "sk_brynjolf",
-            "sk_cicero",
-            "sk_delvin",
-            "sk_dexion",
-            "sk_dragon",
-            "sk_esbern",
-            "sk_florentius",
-            "sk_galmar",
-            "sk_garan",
-            "sk_gelebor",
-            "sk_hadvar",
-            "sk_harkon",
-            "sk_lleril",
-            "sk_isran",
-            "sk_kodlakwhitemane",
-            "sk_maleargonian",
-            "sk_malebandit",
-            "sk_malebrute",
-            "sk_malecommander",
-            "sk_malecommoner",
-            "sk_malecommoneraccented",
-            "sk_malecondescending",
-            "sk_malecoward",
-            "sk_maledarkelfcommoner",
-            "sk_maledarkelfcynical",
-            "sk_maledrunk",
-            "sk_maledunmer",
-            "sk_maleelfhaughty",
-            "sk_maleeventoned",
-            "sk_maleeventonedaccented",
-            "sk_maleguard",
-            "sk_malekhajiit",
-            "sk_malenord",
-            "sk_malenordcommander",
-            "sk_maleoldgrumpy",
-            "sk_maleoldkindly",
-            "sk_maleorc",
-            "sk_maleslycynical",
-            "sk_malesoldier",
-            "sk_malevampire",
-            "sk_malewarlock",
-            "sk_maleyoungeager",
-            "sk_mercerfrey",
-            "sk_modyn",
-            "sk_nazir",
-            "sk_neloth",
-            "sk_odahviing",
-            "sk_paarthurnax",
-            "sk_storn",
-            "sk_tulius",
-            "sk_ulfric"
+            {"MaleUniqueAncano","sk_ancano" },
+            {"CrUniqueAlduin","sk_alduin" },
+            {"MaleUniqueArngeir","sk_arngeir" },
+            {"MaleUniqueBrynjolf","sk_brynjolf" },
+            {"MaleUniqueCicero","sk_cicero" },
+            {"MaleUniqueDelvinMallory","sk_delvin" },
+            {"CrDragonVoice","sk_dragon" },
+            {"MaleUniqueEsbern","sk_esbern" },
+            {"MaleUniqueGalmar","sk_galmar" },
+            {"MaleUniqueHadvar","sk_hadvar" },
+            {"MaleUniqueKodlakWhitemane","sk_kodlakwhitemane" },
+            {"MaleUniqueMercerFrey","sk_mercerfrey" },
+            {"MaleUniqueNazir","sk_nazir" },
+            {"CrUniqueOdahviing","sk_odahviing" },
+            {"CrUniquePaarthurnax","sk_paarthurnax" },
+            {"MaleUniqueTullius","sk_tullius" },
+            {"MaleUniqueUlfric","sk_ulfric" },
+            {"DLC1MaleUniqueFlorentius","sk_florentius" },
+            {"DLC1MaleUniqueIsran","sk_isran" },
+            {"DLC1MaleUniqueHarkon","sk_harkon" },
+            {"DLC1MaleUniqueGelebor","sk_gelebor" },
+            {"DLC1MaleUniqueDexion","sk_dexion" },
+            {"DLC1MaleVampire","sk_malevampire"},
+            {"DLC2MaleUniqueNeloth","sk_neloth" },
+            {"DLC2MaleUniqueStorn","sk_storn" },
+            {"DLC2MaleUniqueLleril","sk_lleril" },
+            {"DLC2MaleUniqueAdril","sk_adril" },
+            {"DLC2MaleUniqueModyn","sk_modyn" },
+            {"DLC2MaleDarkElfCommoner","sk_maledarkelfcommoner" },
+            {"DLC2MaleDarkElfCynical","sk_maledarkelfcynical"},
+
+            {"MaleArgonian","sk_maleargonian"},
+            {"MaleBandit","sk_malebandit"},
+            {"MaleBrute","sk_malebrute"},
+            {"MaleCommander","sk_malecommander"},
+            {"MaleCommoner","sk_malecommoner"},
+            {"MaleCommonerAccented","sk_malecommoneraccented"},
+            {"MaleCondescending","sk_malecondescending"},
+            {"MaleCoward","sk_malecoward"},
+            {"MaleDrunk","sk_maledrunk"},
+            {"MaleDarkElf","sk_maledunmer"},
+            {"MaleElfHaughty","sk_maleelfhaughty"},
+            {"MaleEvenToned","sk_maleeventoned"},
+            {"MaleEvenTonedAccented","sk_maleeventonedaccented"},
+            {"MaleGuard","sk_maleguard"},
+            {"MaleKhajiit","sk_malekhajiit"},
+            {"MaleNord","sk_malenord"},
+            {"MaleNordCommander","sk_malenordcommander"},
+            {"MaleOldGrumpy","sk_maleoldgrumpy"},
+            {"MaleOldKindly","sk_maleoldkindly"},
+            {"MaleOrc","sk_maleorc"},
+            {"MaleSlyCynical","sk_maleslycynical"},
+            {"MaleSoldier","sk_malesoldier"},
+            {"MaleWarlock","sk_malewarlock"},
+            {"MaleYoungEager","sk_maleyoungeager"}
         };
 
-        
-
-        static Dictionary<string, string> xvasynth_model_names = new()
+        static Dictionary<string, string> xvasynth_model_names_female = new()
         {
-            {"maleuniqueancano","sk_ancano" },
-            {"cruniquealduin","sk_alduin" },
-            {"maleuniquearngeir","sk_arngeir" },
-            {"maleuniquebrynjolf","sk_brynjolf" },
-            {"maleuniquecicero","sk_cicero" },
-            {"maleuniquedelvinmallory","sk_delvin" },
-            {"crdragonvoice","sk_dragon" },
-            {"maleuniqueesbern","sk_esbern" },
-            {"maleuniquegalmar","sk_galmar" },
-            {"maleuniquehadvar","sk_hadvar" },
-            {"maleuniquekodlakwhitemane","sk_kodlakwhitemane" },
-            {"maleuniquemercerfrey","sk_mercerfrey" },
-            {"maleuniquenazir","sk_nazir" },
-            {"cruniqueodahviing","sk_odahviing" },
-            {"cruniquepaarthurnax","sk_paarthurnax" },
-            {"maleuniquetullius","sk_tullius" },
-            {"maleuniqueulfric","sk_ulfric" },
-            {"femaleuniqueastrid","sk_astrid" },
-            {"femaleuniquedelphine","sk_delphine" },
-            {"femaleuniqueelenwen","sk_elenwen" },
-            {"femaleuniquekarliah","sk_karliah" },
-            {"femaleuniquemaven","sk_maven" },
-            {"femaleuniquemirabelleervine","sk_mirabelleervine" },
-            {"femaleuniquevex","sk_vex" },
-            {"dlc1seranavoice","sk_serana" },
-            {"dlc1femaleuniquevalerica","sk_valerica" },
-            {"dlc1femaleuniquefura","sk_fura" },
-            {"dlc1maleuniqueflorentius","sk_florentius" },
-            {"dlc1maleuniqueisran","sk_isran" },
-            {"dlc1maleuniqueharkon","sk_harkon" },
-            {"dlc1maleuniquegelebor","sk_gelebor" },
-            {"dlc1maleuniquedexion","sk_dexion" },
-            {"dlc2maleuniqueneloth","sk_neloth" },
-            {"dlc2maleuniquestorn","sk_storn" },
-            {"dlc2maleuniquelleril","sk_lleril" },
-            {"dlc2maleuniqueadril","sk_adril" },
-            {"dlc2maleuniquemodyn","sk_modyn" },
-            {"dlc2femaleuniquefrea","sk_frea" },
-            {"dlc2maledarkelfcommoner","sk_maledarkelfcommoner" },
-            {"sk_dlc2femaledarkelfcommoner","femaledarkelfcommoner" }
+            {"FemaleUniqueAstrid","sk_astrid" },
+            {"FemaleUniqueDelphine","sk_delphine" },
+            {"FemaleUniqueElenwen","sk_elenwen" },
+            {"FemaleUniqueKarliah","sk_karliah" },
+            {"FemaleUniqueMaven","sk_maven" },
+            {"FemaleUniqueMirabelleErvine","sk_mirabelleervine" },
+            {"FemaleUniqueVex","sk_vex" },
+            {"DLC1SeranaVoice","sk_serana" },
+            {"DLC1FemaleUniqueValerica","sk_valerica" },
+            {"DLC1FemaleUniqueFura","sk_fura" },
+            {"DLC1FemaleVampire","sk_femalevampire"},
+            {"DLC2FemaleUniqueFrea","sk_frea" },
+            {"DLC2FemaleDarkElfCommoner","sk_femaledarkelfcommoner" },
+
+            {"FemaleArgonian","sk_femaleargonian"},
+            {"FemaleCommander","sk_femalecommander"},
+            {"FemaleCommoner","sk_femalecommoner"},
+            {"FemaleCondescending","sk_femalecondescending"},
+            {"FemaleCoward","sk_femalecoward"},
+            {"FemaleDarkElf","sk_femaledarkelf"},
+            {"FemaleElfHaughty","sk_femaleelfhaughty"},
+            {"FemaleEvenToned","sk_femaleeventoned"},
+            {"FemaleKhajiit","sk_femalekhajiit"},
+            {"FemaleNord","sk_femalenord"},
+            {"FemaleOldGrumpy","sk_femaleoldgrumpy"},
+            {"FemaleOldKindly","sk_femaleoldkindly"},
+            {"FemaleOrc","sk_femaleorc"},
+            {"FemaleShrill","sk_femaleshrill"},
+            {"FemaleSultry","sk_femalesultry"},
+            {"FemaleYoungEager","sk_femaleyoungeager"}
         };
+        static List<string> voices_xvasynth_male = new();
+        static List<string> voices_xvasynth_female = new();
 
         static List<string> vanilla_skyrim = new()
         {
@@ -197,20 +160,33 @@ namespace NPCFaceSwapper
             rnd = new Random(Settings.Value.Random_Generation_Seed);
 
             // add player to blacklist
-            Settings.Value.Npc_Settings.dest_npc_blacklist.Add(FormKey.Factory("000007:Skyrim.esm"));
+            var player = state.LinkCache.Resolve<INpcGetter>(FormKey.Factory("000007:Skyrim.esm"));
+            Settings.Value.Npc_Settings.dest_npc_blacklist.Add(player);
 
             // add children to blacklist
-            var child_list= new List<string>() { "child" };
+            var child_race_list = new List<FormKey>();
             foreach (var race in state.LoadOrder.PriorityOrder.Race().WinningOverrides())
             {
                 bool found = false;
                 if (race.EditorID != null)
                 {
-                    foreach (string bl in child_list)
+                    foreach (string bl in child_whitelist_words)
                     {
                         if (race.EditorID.Contains(bl, StringComparison.OrdinalIgnoreCase))
                         {
-                            Settings.Value.Npc_Settings.race_blacklist.Add(race);
+                            //Settings.Value.Race_Settings.source_race_blacklist.Add(race);
+                            //Settings.Value.Race_Settings.dest_race_blacklist.Add(race);
+                            child_race_list.Add(race.FormKey);
+                            found = true;
+                            break;
+                        }
+                    }
+                    foreach (string bl in race_blacklist_words)
+                    {
+                        if (race.EditorID.Contains(bl, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Settings.Value.Race_Settings.destination_race_blacklist.Add(race.FormKey);
+                            Settings.Value.Race_Settings.source_race_blacklist.Add(race.FormKey);
                             found = true;
                             break;
                         }
@@ -223,11 +199,23 @@ namespace NPCFaceSwapper
                     var voice = v.Resolve<IVoiceTypeGetter>(state.LinkCache);
                     if (voice.EditorID != null)
                     {
-                        foreach (string bl in child_list)
+                        foreach (string bl in child_whitelist_words)
                         {
                             if (voice.EditorID.Contains(bl, StringComparison.OrdinalIgnoreCase))
                             {
-                                Settings.Value.Npc_Settings.race_blacklist.Add(race);
+                                //Settings.Value.Race_Settings.source_race_blacklist.Add(race);
+                                //Settings.Value.Race_Settings.dest_race_blacklist.Add(race);
+                                child_race_list.Add(race.FormKey);
+                                found = true;
+                                break;
+                            }
+                        }
+                        foreach (string bl in race_blacklist_words)
+                        {
+                            if (voice.EditorID.Contains(bl, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Settings.Value.Race_Settings.destination_race_blacklist.Add(race.FormKey);
+                                Settings.Value.Race_Settings.source_race_blacklist.Add(race.FormKey);
                                 found = true;
                                 break;
                             }
@@ -241,11 +229,23 @@ namespace NPCFaceSwapper
                 {
                     if (skin.EditorID != null)
                     {
-                        foreach (string bl in child_list)
+                        foreach (string bl in child_whitelist_words)
                         {
                             if (skin.EditorID.Contains(bl, StringComparison.OrdinalIgnoreCase))
                             {
-                                Settings.Value.Npc_Settings.race_blacklist.Add(race);
+                                //Settings.Value.Race_Settings.source_race_blacklist.Add(race);
+                                //Settings.Value.Race_Settings.dest_race_blacklist.Add(race);
+                                child_race_list.Add(race.FormKey);
+                                found = true;
+                                break;
+                            }
+                        }
+                        foreach (string bl in race_blacklist_words)
+                        {
+                            if (skin.EditorID.Contains(bl, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Settings.Value.Race_Settings.destination_race_blacklist.Add(race.FormKey);
+                                Settings.Value.Race_Settings.source_race_blacklist.Add(race.FormKey);
                                 found = true;
                                 break;
                             }
@@ -253,10 +253,222 @@ namespace NPCFaceSwapper
                     }
                 }
                 if (found) continue;
-
             }
 
-            // add additional xvasyth models user provided
+            if (Settings.Value.Race_Settings.Use_Race_Based_Matching)
+            {
+                if (Settings.Value.Race_Settings.Strict_Race_Matching)
+                {
+                    race_groups["Breton"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013741:Skyrim.esm"), //breton
+                        FormKey.Factory("097A3E:Skyrim.esm"), //breton afflicted
+                        FormKey.Factory("08883C:Skyrim.esm"), //BRETON vamp
+                    };
+                    race_groups["Imperial"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013744:Skyrim.esm"), //imperial
+                        FormKey.Factory("088844:Skyrim.esm"), //IMPERIAL vamp
+                    };
+                    race_groups["Nord"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013746:Skyrim.esm"), //nord
+                        FormKey.Factory("088794:Skyrim.esm"), //nord vamp
+                        FormKey.Factory("03CA97:Dragonborn.esm"), //miraak
+                    };
+                    race_groups["Redguard"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013748:Skyrim.esm"), //redguard
+                        FormKey.Factory("088846:Skyrim.esm"), //REDGUARD vamp
+                    };
+                    race_groups["DarkElf"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013742:Skyrim.esm"), //DARK ELF
+                        FormKey.Factory("08883D:Skyrim.esm"), //DARK ELF VAMP
+                    };
+                    race_groups["HighElf"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013743:Skyrim.esm"), //HIGH ELF
+                        FormKey.Factory("088840:Skyrim.esm"), //HIGH ELF VAMP
+                    };
+                    race_groups["Orc"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013747:Skyrim.esm"), //ORC
+                        FormKey.Factory("0A82B9:Skyrim.esm"), //ORC VAMP
+                    };
+                    race_groups["WoodElf"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013749:Skyrim.esm"), //WOOD ELF
+                        FormKey.Factory("088884:Skyrim.esm"), //WOOD ELF VAMP
+                    };
+                    race_groups["Argonian"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013740:Skyrim.esm"), //ARGONIAN
+                        FormKey.Factory("08883A:Skyrim.esm"), //ARGONIAN VAMP
+
+                    };
+                    race_groups["Khajiit"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013745:Skyrim.esm"), //KHAJIIT
+                        FormKey.Factory("088845:Skyrim.esm"), //KHAJIIT VAMP
+                    };
+                    race_groups["Elder"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("067CD8:Skyrim.esm"), //elder
+                        FormKey.Factory("0A82BA:Skyrim.esm"), //elder VAMP
+                    };
+                    race_groups["SnowElf"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("00377D:Dawnguard.esm"), //snow elf
+                    };
+                    race_groups["Dremora"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("0131F0:Skyrim.esm"), //dremora
+                    };
+
+                }
+                else if (Settings.Value.Race_Settings.Humanlike_Race_Matching)
+                {
+                    race_groups["Humanlike"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013741:Skyrim.esm"), //breton
+                        FormKey.Factory("097A3D:Skyrim.esm"), //breton afflicted
+                        FormKey.Factory("013744:Skyrim.esm"), //imperial
+                        FormKey.Factory("013746:Skyrim.esm"), //nord
+                        FormKey.Factory("03CA97:Dragonborn.esm"), //miraak
+                        FormKey.Factory("013748:Skyrim.esm"), //redguard
+                        FormKey.Factory("088794:Skyrim.esm"), //nord vamp
+                        FormKey.Factory("08883C:Skyrim.esm"), //BRETON vamp
+                        FormKey.Factory("088844:Skyrim.esm"), //IMPERIAL vamp
+                        FormKey.Factory("088846:Skyrim.esm"), //REDGUARD vamp
+                        FormKey.Factory("013742:Skyrim.esm"), //DARK ELF
+                        FormKey.Factory("013743:Skyrim.esm"), //HIGH ELF
+                        FormKey.Factory("013747:Skyrim.esm"), //ORC
+                        FormKey.Factory("013749:Skyrim.esm"), //WOOD ELF
+                        FormKey.Factory("08883D:Skyrim.esm"), //DARK ELF VAMP
+                        FormKey.Factory("088840:Skyrim.esm"), //HIGH ELF VAMP
+                        FormKey.Factory("088884:Skyrim.esm"), //WOOD ELF VAMP
+                        FormKey.Factory("0A82B9:Skyrim.esm"), //ORC VAMP
+                        FormKey.Factory("067CD8:Skyrim.esm"), //elder
+                        FormKey.Factory("0A82BA:Skyrim.esm"), //elder VAMP
+                        FormKey.Factory("00377D:Dawnguard.esm"), //snow elf
+                        FormKey.Factory("0131F0:Skyrim.esm"), //dremora
+                    };
+                    race_groups["Argonian"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013740:Skyrim.esm"), //ARGONIAN
+                        FormKey.Factory("08883A:Skyrim.esm"), //ARGONIAN VAMP
+
+                    };
+                    race_groups["Khajiit"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013745:Skyrim.esm"), //KHAJIIT
+                        FormKey.Factory("088845:Skyrim.esm"), //KHAJIIT VAMP
+                    };
+                }
+                else
+                {
+                    race_groups["Human"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013741:Skyrim.esm"), //breton
+                        FormKey.Factory("097A3D:Skyrim.esm"), //breton afflicted
+                        FormKey.Factory("013744:Skyrim.esm"), //imperial
+                        FormKey.Factory("013746:Skyrim.esm"), //nord
+                        FormKey.Factory("03CA97:Dragonborn.esm"), //miraak
+                        FormKey.Factory("013748:Skyrim.esm"), //redguard
+                        FormKey.Factory("088794:Skyrim.esm"), //nord vamp
+                        FormKey.Factory("08883C:Skyrim.esm"), //BRETON vamp
+                        FormKey.Factory("088844:Skyrim.esm"), //IMPERIAL vamp
+                        FormKey.Factory("088846:Skyrim.esm"), //REDGUARD vamp
+                        FormKey.Factory("067CD8:Skyrim.esm"), //elder
+                        FormKey.Factory("0A82BA:Skyrim.esm"), //elder VAMP
+                    };
+                    race_groups["Elves"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013742:Skyrim.esm"), //DARK ELF
+                        FormKey.Factory("013743:Skyrim.esm"), //HIGH ELF
+                        FormKey.Factory("013747:Skyrim.esm"), //ORC
+                        FormKey.Factory("013749:Skyrim.esm"), //WOOD ELF
+                        FormKey.Factory("08883D:Skyrim.esm"), //DARK ELF VAMP
+                        FormKey.Factory("088840:Skyrim.esm"), //HIGH ELF VAMP
+                        FormKey.Factory("088884:Skyrim.esm"), //WOOD ELF VAMP
+                        FormKey.Factory("0A82B9:Skyrim.esm"), //ORC VAMP
+                        FormKey.Factory("00377D:Dawnguard.esm"), //snow elf
+                        FormKey.Factory("0131F0:Skyrim.esm"), //dremora
+                    };
+                    race_groups["Argonian"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013740:Skyrim.esm"), //ARGONIAN
+                        FormKey.Factory("08883A:Skyrim.esm"), //ARGONIAN VAMP
+
+                    };
+                    race_groups["Khajiit"] = new List<FormKey>()
+                    {
+                        FormKey.Factory("013745:Skyrim.esm"), //KHAJIIT
+                        FormKey.Factory("088845:Skyrim.esm"), //KHAJIIT VAMP
+                    };
+
+                }
+            }
+            else
+            {
+                race_groups["Adult"] = new List<FormKey>()
+                {
+                    FormKey.Factory("013741:Skyrim.esm"), //breton
+                    FormKey.Factory("097A3D:Skyrim.esm"), //breton afflicted
+                    FormKey.Factory("013744:Skyrim.esm"), //imperial
+                    FormKey.Factory("013746:Skyrim.esm"), //nord
+                    FormKey.Factory("013748:Skyrim.esm"), //redguard
+                    FormKey.Factory("088794:Skyrim.esm"), //nord vamp
+                    FormKey.Factory("03CA97:Dragonborn.esm"), //miraak
+                    FormKey.Factory("08883C:Skyrim.esm"), //BRETON vamp
+                    FormKey.Factory("088844:Skyrim.esm"), //IMPERIAL vamp
+                    FormKey.Factory("088846:Skyrim.esm"), //REDGUARD vamp
+                    FormKey.Factory("013742:Skyrim.esm"), //DARK ELF
+                    FormKey.Factory("013743:Skyrim.esm"), //HIGH ELF
+                    FormKey.Factory("013747:Skyrim.esm"), //ORC
+                    FormKey.Factory("013749:Skyrim.esm"), //WOOD ELF
+                    FormKey.Factory("08883D:Skyrim.esm"), //DARK ELF VAMP
+                    FormKey.Factory("088840:Skyrim.esm"), //HIGH ELF VAMP
+                    FormKey.Factory("088884:Skyrim.esm"), //WOOD ELF VAMP
+                    FormKey.Factory("0A82B9:Skyrim.esm"), //ORC VAMP
+                    FormKey.Factory("013740:Skyrim.esm"), //ARGONIAN
+                    FormKey.Factory("08883A:Skyrim.esm"), //ARGONIAN VAMP
+                    FormKey.Factory("013745:Skyrim.esm"), //KHAJIIT
+                    FormKey.Factory("088845:Skyrim.esm"), //KHAJIIT VAMP
+                    FormKey.Factory("067CD8:Skyrim.esm"), //elder
+                    FormKey.Factory("0A82BA:Skyrim.esm"), //elder VAMP
+                    FormKey.Factory("00377D:Dawnguard.esm"), //snow elf
+                    FormKey.Factory("0131F0:Skyrim.esm"), //dremora
+                };
+
+            }
+            race_groups["Child"] = new List<FormKey>()
+            {
+                FormKey.Factory("108272:Skyrim.esm"), //BRETON CHILD vamp
+                FormKey.Factory("02C659:Skyrim.esm"), //IMPERIAL CHILD
+                FormKey.Factory("02C65A:Skyrim.esm"), //REDGUARD CHILD
+                FormKey.Factory("02C65B:Skyrim.esm"), //NORD CHILD
+                FormKey.Factory("02C65C:Skyrim.esm"), //BRETON CHILD
+            };
+            race_groups["Other"] = new List<FormKey>();
+
+            foreach (var r in child_race_list)
+            {
+                if (race_groups["Child"].Contains(r)) continue;
+                race_groups["Child"].Add(r);
+            }
+
+            foreach (var kvp in xvasynth_model_names_female)
+            {
+                voices_xvasynth_female.Add(kvp.Value);
+            }
+            foreach (var kvp in xvasynth_model_names_male)
+            {
+                voices_xvasynth_male.Add(kvp.Value);
+            }
+
+            //add additional xvasyth models user provided
             if (Settings.Value.Voice_Settings.additional_xvasynth_female_models.Count > 0)
             {
                 voices_xvasynth_female.AddRange(Settings.Value.Voice_Settings.additional_xvasynth_female_models);
@@ -265,6 +477,9 @@ namespace NPCFaceSwapper
             {
                 voices_xvasynth_male.AddRange(Settings.Value.Voice_Settings.additional_xvasynth_male_models);
             }
+
+
+
 
             //iterate through all races for valid ones
             // given that it's difficult to evaluate a race to determine whether its npcs will be valid, better to just check for facegen in each npc record
@@ -327,26 +542,6 @@ namespace NPCFaceSwapper
                 return false;
             }
 
-            if (Settings.Value.Npc_Settings.source_npc_blacklist.Count > 0
-                && Settings.Value.Npc_Settings.source_npc_whitelist.Count > 0)
-            {
-                Log("dest_npcs are listed in both the Source NPC Whitelist and the Source NPC Blacklist\nPlease only use one list for Source dest_npcs");
-                return false;
-            }
-            if (Settings.Value.Npc_Settings.dest_npc_blacklist.Count > 0
-                && Settings.Value.Npc_Settings.dest_npc_whitelist.Count > 0)
-            {
-                Log("dest_npcs are listed in both the Destination NPC Whitelist and the Destination NPC Blacklist\nPlease only use one list for Destination dest_npcs");
-                return false;
-            }
-
-            if (Settings.Value.Npc_Settings.dest_fact_blacklist.Count > 0
-                && Settings.Value.Npc_Settings.dest_fact_whitelist.Count > 0)
-            {
-                Log("dest_npcs are listed in both the Destination Faction Whitelist and the Destination Faction Blacklist\nPlease only use one list for Factions");
-                return false;
-            }
-
             if (Settings.Value.Npc_Swap_Settings.NPC_Swaps_Source_NPC_List.Count !=
                 Settings.Value.Npc_Swap_Settings.NPC_Swaps_Dest_NPC_List.Count ||
                 Settings.Value.Npc_Swap_Settings.NPC_Swaps_Source_NPC_List.Count !=
@@ -355,19 +550,27 @@ namespace NPCFaceSwapper
                 Log("NPC Swap settings are incorrect. The Source, Dest, and Plugin lists must have the same length");
                 return false;
             }
-
+            if (Settings.Value.Race_Settings.Use_Race_Based_Matching)
+            {
+                if (Settings.Value.Race_Settings.Strict_Race_Matching && Settings.Value.Race_Settings.Humanlike_Race_Matching)
+                {
+                    Log("Only one niche race based matching setting can be used. Choose either Strict, Humanlike, or neither.");
+                    return false;
+                }
+            }
 
             var gendersettings = Convert.ToInt16(Settings.Value.Gender_Settings.Make_All_Male) +
                 Convert.ToInt16(Settings.Value.Gender_Settings.Make_All_Female) +
-                Convert.ToInt16(Settings.Value.Gender_Settings.Randomize_Genders);
+                Convert.ToInt16(Settings.Value.Gender_Settings.Randomize_Genders)+
+                Convert.ToInt16(Settings.Value.Gender_Settings.Reverse_Genders);
             if (gendersettings > 1)
             {
-                Log("Only one gender setting can be used.");
+                Log("Only one main gender setting can be used.");
                 return false;
             }
 
             if (Settings.Value.Npc_Swap_Settings.NPC_Swaps_Source_NPC_List.Count == 0 &&
-                gendersettings < 1)
+                gendersettings < 1 && !Settings.Value.Gender_Settings.Randomize_Within_Genders)
             {
                 Log("At least one Gender setting must be selected if there are no NPC swaps to perform.");
                 return false;
@@ -415,6 +618,18 @@ namespace NPCFaceSwapper
                 Log("You must select at least one SOS addon to set former males as futa.");
                 return false;
             }
+
+            if (Settings.Value.Voice_Settings.Generate_Voice_CSV && Settings.Value.Voice_Settings.Use_Original_Voice)
+            {
+                Log("You can select only \"Generate Voice CSV\" or \"Use Original Voice\", not both.");
+                return false;
+            }
+            if (Settings.Value.Voice_Settings.Use_Original_Voice && Settings.Value.Voice_Settings.Use_Random_Voice)
+            {
+                Log("You can select only \"Use Random Voice\" or \"Use Original Voice\", not both.");
+                return false;
+            }
+
             return true;
         }
 
@@ -453,6 +668,7 @@ namespace NPCFaceSwapper
                         //filter by incompatible NPCs (creatures, animals, anything without facegen)
                         if (npcContext.Record.HeadParts == null || npcContext.Record.HeadParts.Count == 0) continue;
                         if (npcContext.Record.Configuration.TemplateFlags.HasFlag(NpcConfiguration.TemplateFlag.Traits)) continue;
+                        if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.IsCharGenFacePreset)) continue;
 
                         if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female)) dest_f.Add(new FormLink<INpcGetter>(npcContext.Record));
                         else dest_m.Add(new FormLink<INpcGetter>(npcContext.Record));
@@ -468,19 +684,21 @@ namespace NPCFaceSwapper
                     //filter by incompatible NPCs (creatures, animals, anything without facegen)
                     if (npcContext.Record.HeadParts == null || npcContext.Record.HeadParts.Count==0) continue;
                     if (npcContext.Record.Configuration.TemplateFlags.HasFlag(NpcConfiguration.TemplateFlag.Traits)) continue;
+                    if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.IsCharGenFacePreset)) continue;
+
                     if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female)) dest_f.Add(new FormLink<INpcGetter>(npcContext.Record));
                     else dest_m.Add(new FormLink<INpcGetter>(npcContext.Record));
                 }
             }
 
             // filter by race
-            if (Settings.Value.Npc_Settings.race_blacklist.Count > 0)
+            if (Settings.Value.Race_Settings.destination_race_blacklist.Count > 0)
             {
                 var toremove = new List<FormLink<INpcGetter>>();
                 foreach (var npcfl in dest_m)
                 {
                     var npc = npcfl.Resolve<INpcGetter>(state.LinkCache);
-                    if (Settings.Value.Npc_Settings.race_blacklist.Contains(npc.Race))
+                    if (Settings.Value.Race_Settings.destination_race_blacklist.Contains(npc.Race))
                     {
                         toremove.Add(npcfl);
                         continue;
@@ -493,7 +711,7 @@ namespace NPCFaceSwapper
                 foreach (var npcfl in dest_f)
                 {
                     var npc = npcfl.Resolve<INpcGetter>(state.LinkCache);
-                    if (Settings.Value.Npc_Settings.race_blacklist.Contains(npc.Race))
+                    if (Settings.Value.Race_Settings.destination_race_blacklist.Contains(npc.Race))
                     {
                         toremove.Add(npcfl);
                         continue;
@@ -618,6 +836,7 @@ namespace NPCFaceSwapper
                     {
                         if (npcContext.Record.HeadParts == null || npcContext.Record.HeadParts.Count == 0) continue;
                         if (npcContext.Record.Configuration.TemplateFlags.HasFlag(NpcConfiguration.TemplateFlag.Traits)) continue;
+                        if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.IsCharGenFacePreset)) continue;
 
                         if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female)) source_f.Add(new FormLink<INpcGetter>(npcContext.Record));
                         else source_m.Add(new FormLink<INpcGetter>(npcContext.Record));
@@ -632,6 +851,7 @@ namespace NPCFaceSwapper
                     //filter by incompatible NPCs (creatures, animals, anything without facegen)
                     if (npcContext.Record.HeadParts == null || npcContext.Record.HeadParts.Count == 0) continue;
                     if (npcContext.Record.Configuration.TemplateFlags.HasFlag(NpcConfiguration.TemplateFlag.Traits)) continue;
+                    if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.IsCharGenFacePreset)) continue;
 
                     if (npcContext.Record.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female)) source_f.Add(new FormLink<INpcGetter>(npcContext.Record));
                     else source_m.Add(new FormLink<INpcGetter>(npcContext.Record));
@@ -639,14 +859,14 @@ namespace NPCFaceSwapper
             }
 
             // filter by race
-            if (Settings.Value.Npc_Settings.race_blacklist.Count > 0)
+            if (Settings.Value.Race_Settings.source_race_blacklist.Count > 0)
             {
                 var toremove = new List<FormLink<INpcGetter>>();
 
                 foreach (var npcfl in source_m)
                 {
                     var npc = npcfl.Resolve<INpcGetter>(state.LinkCache);
-                    if (Settings.Value.Npc_Settings.race_blacklist.Contains(npc.Race))
+                    if (Settings.Value.Race_Settings.source_race_blacklist.Contains(npc.Race))
                     {
                         toremove.Add(npcfl);
                         continue;
@@ -659,7 +879,7 @@ namespace NPCFaceSwapper
                 foreach (var npcfl in source_f)
                 {
                     var npc = npcfl.Resolve<INpcGetter>(state.LinkCache);
-                    if (Settings.Value.Npc_Settings.race_blacklist.Contains(npc.Race))
+                    if (Settings.Value.Race_Settings.source_race_blacklist.Contains(npc.Race))
                     {
                         toremove.Add(npcfl);
                         continue;
@@ -874,441 +1094,60 @@ namespace NPCFaceSwapper
                     }
                 }
             }
-            //return npc_map;
 
             // now assign the randomized npcs from the winning overrides
             // assign all male, assign all female, swap all genders, random gender assignment, random swaps within gender
-            // all male exclusive to all female exclusive to swap all genders exclusive to random gender assignment
-            // also can have the additional random swaps within gender only for all male or all female or random assignment(where there are some untouched npcs)
-            int inc = 0;
 
-            //var rs = new RandomSource();
-            var rs = new RandomSource(Settings.Value.Random_Generation_Seed);
 
 
             if (Settings.Value.Gender_Settings.Make_All_Male)
             {
                 // we use the source_m and dest_f
-                dest_f.Randomize(rs);
-                source_m.Randomize(rs);
+                Create_Swaps(ref npc_map, copies, source_m, dest_f);
 
-                foreach (var dnpcfl in dest_f)
+                if (Settings.Value.Gender_Settings.Randomize_Within_Genders)
                 {
-
-                    var dnpc = dnpcfl.Resolve<INpcGetter>(state.LinkCache);
-
-                    // check name in copies
-                    var dest_list = new List<FormKey> { };
-                    var name = dnpc.Name!.ToString()!;
-                    if (copies.ContainsKey(name))
-                    {
-                        var majorlist = copies[name];
-
-                        for (int j = 0; j < majorlist.Count; j++)
-                        {
-                            var checkednpc = state.LinkCache.Resolve<INpcGetter>(majorlist[j][0]);
-                            if (checkednpc.HeadParts.Count != dnpc.HeadParts.Count)
-                            {
-                                // check other minorlists
-                                continue;
-                            }
-                            bool headpart_mismatch = false;
-                            foreach (var chp in checkednpc.HeadParts)
-                            {
-                                if (!dnpc.HeadParts.Contains(chp))
-                                {
-                                    headpart_mismatch = true;
-                                    break;
-                                }
-                            }
-                            if (headpart_mismatch) continue;
-                            // here, the headparts match, the name is the same, so they belong to the same collection
-                            dest_list.AddRange(majorlist[j]);
-                            break;
-                        }
-                    }
-                    else dest_list.Add(dnpc.FormKey);
-
-                    foreach (var cdnpcfk in dest_list)
-                    {
-                        var fl = new FormLink<INpcGetter>(cdnpcfk);
-                        if (npc_map.Contains(new NPCSwap(fl, source_m[inc], null))) continue;
-                        npc_map.Add(new NPCSwap(fl, source_m[inc], null));
-                    }
-                    inc++;
-                    if (inc == source_m.Count) inc = 0;
-
+                    // use source_m and dest_m
+                    Create_Swaps(ref npc_map, copies, source_m, dest_m);
                 }
-
             }
             else if (Settings.Value.Gender_Settings.Make_All_Female)
             {
                 // we use the source_f and dest_m
-                dest_m.Randomize(rs);
-                source_f.Randomize(rs);
-
-                foreach (var dnpcfl in dest_m)
+                Create_Swaps(ref npc_map, copies, source_f, dest_m);
+                
+                if (Settings.Value.Gender_Settings.Randomize_Within_Genders)
                 {
-
-                    var dnpc = dnpcfl.Resolve<INpcGetter>(state.LinkCache);
-
-                    // check name in copies
-                    var dest_list = new List<FormKey> { };
-
-                    string name = "UnknownNpc";
-                    if (dnpc.Name!=null) name = dnpc.Name!.ToString()!;
-
-                    if (copies.ContainsKey(name))
-                    {
-                        var majorlist = copies[name];
-
-                        for (int j = 0; j < majorlist.Count; j++)
-                        {
-                            var checkednpc = state.LinkCache.Resolve<INpcGetter>(majorlist[j][0]);
-                            if (checkednpc.HeadParts.Count != dnpc.HeadParts.Count)
-                            {
-                                // check other minorlists
-                                continue;
-                            }
-                            bool headpart_mismatch = false;
-                            foreach (var chp in checkednpc.HeadParts)
-                            {
-                                if (!dnpc.HeadParts.Contains(chp))
-                                {
-                                    headpart_mismatch = true;
-                                    break;
-                                }
-                            }
-                            if (headpart_mismatch) continue;
-                            // here, the headparts match, the name is the same, so they belong to the same collection
-                            dest_list.AddRange(majorlist[j]);
-                            break;
-                        }
-                    }
-                    else dest_list.Add(dnpc.FormKey);
-
-                    if (Settings.Value.Futa_Settings.Set_Former_Males_as_Futa)
-                    {
-
-                        int index = 0;
-                        ModKey sos_plug = new("Skyrim",ModType.Master);
-                        sbyte sos_size = -1;
-
-                        if (Settings.Value.Futa_Settings.Futa_Choice_NPC.Contains(dnpcfl)) 
-                        {
-                            index = Settings.Value.Futa_Settings.Futa_Choice_NPC.IndexOf(dnpcfl);
-
-                            sos_plug = Settings.Value.Futa_Settings.Futa_Choice_Addon[index];
-                            sos_size = (sbyte)Settings.Value.Futa_Settings.Futa_Choice_Size[index];
-                        }
-
-
-                        if (sos_size == -1)
-                        {
-                            if (Settings.Value.Futa_Settings.Futa_Size_randomization == 0)
-                            {
-                                sos_size = (sbyte)RandomNormal(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max);
-                            }
-                            else
-                            {
-                                sos_size = (sbyte)rnd.Next(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max + 1);
-                            }
-                        }
-                        if (sos_plug.Name == "Skyrim")
-                        {
-                            sos_plug = Settings.Value.Futa_Settings.Futa_Addon_Plugins[rnd.Next(Settings.Value.Futa_Settings.Futa_Addon_Plugins.Count)];
-                        }
-
-                        foreach (var cdnpcfk in dest_list)
-                        {
-                            var fl = new FormLink<INpcGetter>(cdnpcfk);
-                            if (npc_map.Contains(new NPCSwap(fl, source_f[inc], null))) continue;
-                            npc_map.Add(new NPCSwap(fl, source_f[inc], null, true, sos_plug, sos_size));
-                        }
-                    }
-                    else
-                    {
-                        foreach (var cdnpcfk in dest_list)
-                        {
-                            var fl = new FormLink<INpcGetter>(cdnpcfk);
-                            if (npc_map.Contains(new NPCSwap(fl, source_f[inc], null))) continue;
-                            npc_map.Add(new NPCSwap(fl, source_m[inc], null));
-                        }
-                    }
-                    inc++;
-                    if (inc == source_f.Count) inc = 0;
+                    // use source_f and dest_f
+                    Create_Swaps(ref npc_map, copies, source_f, dest_f);
+                    
                 }
-
             }
             else if (Settings.Value.Gender_Settings.Randomize_Genders)
             {
-                // we use source_f and source_m AND dest_f and dest_m
-                source_m.Randomize(rs);
-                source_f.Randomize(rs);
-
                 var dest_both = new List<FormLink<INpcGetter>>();
                 dest_both.AddRange(dest_m);
                 dest_both.AddRange(dest_f);
-                dest_both.Randomize(rs);
+                var source_both = new List<FormLink<INpcGetter>>();
+                source_both.AddRange(source_m);
+                source_both.AddRange(source_f);
 
-                int inc_m = 0;
-                int inc_f = 0;
+                Create_Swaps(ref npc_map, copies, source_both, dest_both);
 
-
-                foreach (var dnpcfl in dest_both)
-                {
-
-                    var dnpc = dnpcfl.Resolve<INpcGetter>(state.LinkCache);
-
-                    // check name in copies
-                    var dest_list = new List<FormKey> { };
-                    var name = dnpc.Name!.ToString()!;
-                    if (copies.ContainsKey(name))
-                    {
-                        var majorlist = copies[name];
-
-                        for (int j = 0; j < majorlist.Count; j++)
-                        {
-                            var checkednpc = state.LinkCache.Resolve<INpcGetter>(majorlist[j][0]);
-                            if (checkednpc.HeadParts.Count != dnpc.HeadParts.Count)
-                            {
-                                // check other minorlists
-                                continue;
-                            }
-                            bool headpart_mismatch = false;
-                            foreach (var chp in checkednpc.HeadParts)
-                            {
-                                if (!dnpc.HeadParts.Contains(chp))
-                                {
-                                    headpart_mismatch = true;
-                                    break;
-                                }
-                            }
-                            if (headpart_mismatch) continue;
-                            // here, the headparts match, the name is the same, so they belong to the same collection
-                            dest_list.AddRange(majorlist[j]);
-                            break;
-                        }
-                    }
-                    else dest_list.Add(dnpc.FormKey);
-
-                    var gender_select = rnd.Next(0, 2);
-                    FormLink<INpcGetter> snpcfl;
-
-                    if (gender_select==0)//male
-                    {
-                        snpcfl = source_m[inc_m];
-                        inc_m++;
-                        if (inc_m == source_m.Count) inc_m = 0;
-                    }
-                    else
-                    {
-                        snpcfl = source_f[inc_f];
-                        inc_f++;
-                        if (inc_f == source_f.Count) inc_f = 0;
-                    }
-
-
-                    var dg = dnpc.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female);
-                    var sg = snpcfl.Resolve<INpcGetter>(state.LinkCache).Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female);
-
-                    bool contains = Settings.Value.Futa_Settings.Futa_Choice_NPC.Contains(dnpcfl);
-                    if ((!dg && sg) && (contains || Settings.Value.Futa_Settings.Set_Former_Males_as_Futa))
-                    {
-                        int index = 0;
-                        ModKey sos_plug = new("Skyrim", ModType.Master);
-                        sbyte sos_size = -1;
-
-                        if (contains)
-                        {
-                            index = Settings.Value.Futa_Settings.Futa_Choice_NPC.IndexOf(dnpcfl);
-
-                            sos_plug = Settings.Value.Futa_Settings.Futa_Choice_Addon[index];
-                            sos_size = (sbyte)Settings.Value.Futa_Settings.Futa_Choice_Size[index];
-                        }
-
-                        if (sos_size == -1)
-                        {
-                            if (Settings.Value.Futa_Settings.Futa_Size_randomization == 0)
-                            {
-                                sos_size = (sbyte)RandomNormal(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max);
-                            }
-                            else
-                            {
-                                sos_size = (sbyte)rnd.Next(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max + 1);
-                            }
-                        }
-                        if (sos_plug.Name == "Skyrim")
-                        {
-                            sos_plug = Settings.Value.Futa_Settings.Futa_Addon_Plugins[rnd.Next(Settings.Value.Futa_Settings.Futa_Addon_Plugins.Count)];
-                        }
-
-                        foreach (var cdnpcfk in dest_list)
-                        {
-                            var fl = new FormLink<INpcGetter>(cdnpcfk);
-                            if (npc_map.Contains(new NPCSwap(fl, snpcfl, null))) continue;
-                            npc_map.Add(new NPCSwap(fl, snpcfl, null, true, sos_plug, sos_size));
-                        }
-                    }
-                    else
-                    {
-                        foreach (var cdnpcfk in dest_list)
-                        {
-                            var fl = new FormLink<INpcGetter>(cdnpcfk);
-                            if (npc_map.Contains(new NPCSwap(fl, snpcfl, null))) continue;
-                            npc_map.Add(new NPCSwap(fl, snpcfl, null));
-                        }
-                    }
-                }
             }
             else if (Settings.Value.Gender_Settings.Reverse_Genders)
             {
                 // we use source_f to dest_m AND source_m to dest_f
+                Create_Swaps(ref npc_map, copies, source_f, dest_m);
+                Create_Swaps(ref npc_map, copies, source_m, dest_f);
 
-                dest_m.Randomize(rs);
-                dest_f.Randomize(rs);
-                source_m.Randomize(rs);
-                source_f.Randomize(rs);
+            }
+            else if (Settings.Value.Gender_Settings.Randomize_Within_Genders)
+            {
 
-
-                //male to female
-                foreach (var dnpcfl in dest_m)
-                {
-
-                    var dnpc = dnpcfl.Resolve<INpcGetter>(state.LinkCache);
-
-                    // check name in copies
-                    var dest_list = new List<FormKey> { };
-                    var name = dnpc.Name!.ToString()!;
-                    if (copies.ContainsKey(name))
-                    {
-                        var majorlist = copies[name];
-
-                        for (int j = 0; j < majorlist.Count; j++)
-                        {
-                            var checkednpc = state.LinkCache.Resolve<INpcGetter>(majorlist[j][0]);
-                            if (checkednpc.HeadParts.Count != dnpc.HeadParts.Count)
-                            {
-                                // check other minorlists
-                                continue;
-                            }
-                            bool headpart_mismatch = false;
-                            foreach (var chp in checkednpc.HeadParts)
-                            {
-                                if (!dnpc.HeadParts.Contains(chp))
-                                {
-                                    headpart_mismatch = true;
-                                    break;
-                                }
-                            }
-                            if (headpart_mismatch) continue;
-                            // here, the headparts match, the name is the same, so they belong to the same collection
-                            dest_list.AddRange(majorlist[j]);
-                            break;
-                        }
-                    }
-                    else dest_list.Add(dnpc.FormKey);
-
-                    if (Settings.Value.Futa_Settings.Set_Former_Males_as_Futa)
-                    {
-
-                        int index = 0;
-                        ModKey sos_plug = new("Skyrim", ModType.Master);
-                        sbyte sos_size = -1;
-
-                        if (Settings.Value.Futa_Settings.Futa_Choice_NPC.Contains(dnpcfl))
-                        {
-                            index = Settings.Value.Futa_Settings.Futa_Choice_NPC.IndexOf(dnpcfl);
-
-                            sos_plug = Settings.Value.Futa_Settings.Futa_Choice_Addon[index];
-                            sos_size = (sbyte)Settings.Value.Futa_Settings.Futa_Choice_Size[index];
-                        }
-
-
-                        if (sos_size == -1)
-                        {
-                            if (Settings.Value.Futa_Settings.Futa_Size_randomization == 0)
-                            {
-                                sos_size = (sbyte)RandomNormal(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max);
-                            }
-                            else
-                            {
-                                sos_size = (sbyte)rnd.Next(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max + 1);
-                            }
-                        }
-                        if (sos_plug.Name == "Skyrim")
-                        {
-                            sos_plug = Settings.Value.Futa_Settings.Futa_Addon_Plugins[rnd.Next(Settings.Value.Futa_Settings.Futa_Addon_Plugins.Count)];
-                        }
-
-                        foreach (var cdnpcfk in dest_list)
-                        {
-                            var fl = new FormLink<INpcGetter>(cdnpcfk);
-                            if (npc_map.Contains(new NPCSwap(fl, source_f[inc], null))) continue;
-                            npc_map.Add(new NPCSwap(fl, source_f[inc], null, true, sos_plug, sos_size));
-                        }
-                    }
-                    else
-                    {
-                        foreach (var cdnpcfk in dest_list)
-                        {
-                            var fl = new FormLink<INpcGetter>(cdnpcfk);
-                            if (npc_map.Contains(new NPCSwap(fl, source_f[inc], null))) continue;
-                            npc_map.Add(new NPCSwap(fl, source_m[inc], null));
-                        }
-                    }
-                    inc++;
-                    if (inc == source_f.Count) inc = 0;
-                }
-
-                inc = 0;
-                //female to male
-                foreach (var dnpcfl in dest_f)
-                {
-
-                    var dnpc = dnpcfl.Resolve<INpcGetter>(state.LinkCache);
-
-                    // check name in copies
-                    var dest_list = new List<FormKey> { };
-                    var name = dnpc.Name!.ToString()!;
-                    if (copies.ContainsKey(name))
-                    {
-                        var majorlist = copies[name];
-
-                        for (int j = 0; j < majorlist.Count; j++)
-                        {
-                            var checkednpc = state.LinkCache.Resolve<INpcGetter>(majorlist[j][0]);
-                            if (checkednpc.HeadParts.Count != dnpc.HeadParts.Count)
-                            {
-                                // check other minorlists
-                                continue;
-                            }
-                            bool headpart_mismatch = false;
-                            foreach (var chp in checkednpc.HeadParts)
-                            {
-                                if (!dnpc.HeadParts.Contains(chp))
-                                {
-                                    headpart_mismatch = true;
-                                    break;
-                                }
-                            }
-                            if (headpart_mismatch) continue;
-                            // here, the headparts match, the name is the same, so they belong to the same collection
-                            dest_list.AddRange(majorlist[j]);
-                            break;
-                        }
-                    }
-                    else dest_list.Add(dnpc.FormKey);
-
-                    foreach (var cdnpcfk in dest_list)
-                    {
-                        var fl = new FormLink<INpcGetter>(cdnpcfk);
-                        if (npc_map.Contains(new NPCSwap(fl, source_m[inc], null))) continue;
-                        npc_map.Add(new NPCSwap(fl, source_m[inc], null));
-                    }
-                    inc++;
-                    if (inc == source_m.Count) inc = 0;
-                }
+                // we use the source_m and dest_f
+                Create_Swaps(ref npc_map, copies, source_f, dest_f);
+                Create_Swaps(ref npc_map, copies, source_m, dest_m);
             }
 
             //var dt = DateTime.Now;
@@ -1319,6 +1158,186 @@ namespace NPCFaceSwapper
             //}
 
             return npc_map;
+        }
+
+        private static void Create_Swaps(ref HashSet<NPCSwap> map,
+            Dictionary<string, List<List<FormKey>>> copies,
+            List<FormLink<INpcGetter>> source_list, 
+            List<FormLink<INpcGetter>> dest_list)
+        {
+            //Log("Start create swap");
+            var source_dict = new Dictionary<string, List<FormLink<INpcGetter>>>();
+            var inc_dict = new Dictionary<string, int>();
+
+            //Log("init inc dict and source dict");
+            foreach (var kvp in race_groups)
+            {
+                inc_dict[kvp.Key] = 0;
+                source_dict[kvp.Key] = new List<FormLink<INpcGetter>>();
+            }
+            //Log("randomize");
+            var rs = new RandomSource(Settings.Value.Random_Generation_Seed);
+            source_list.Randomize(rs);
+            dest_list.Randomize(rs);
+            int inc = 0;
+
+            //Log("loop source list to populate source dict");
+            foreach (var snpcfl in source_list)
+            {
+                var snpc = snpcfl.Resolve<INpcGetter>(state!.LinkCache);
+                bool found = false;
+                foreach (var kvp in race_groups)
+                {
+                    if (kvp.Value.Contains(snpc.Race.FormKey))
+                    {
+                        source_dict[kvp.Key].Add(snpcfl);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    Log($"{snpc.FormKey} is a {snpc.Race} could not find entry in race groups");
+                }
+            }
+
+            //Log("loop dest list");
+            foreach (var dnpcfl in dest_list)
+            {
+
+                //Log("resolve dest npc");
+                var dnpc = dnpcfl.Resolve<INpcGetter>(state!.LinkCache);
+
+                // check name in copies
+                //Log("Check name");
+                var dest_copies = new List<FormKey> { };
+                var name = "UnknownNPC";
+                if (dnpc.Name != null && !dnpc.Name.String.IsNullOrEmpty()) name = dnpc.Name.String;
+
+                if (copies.ContainsKey(name))
+                {
+                    var majorlist = copies[name];
+
+                    for (int j = 0; j < majorlist.Count; j++)
+                    {
+                        var checkednpc = state.LinkCache.Resolve<INpcGetter>(majorlist[j][0]);
+                        if (checkednpc.HeadParts.Count != dnpc.HeadParts.Count)
+                        {
+                            // check other minorlists
+                            continue;
+                        }
+                        bool headpart_mismatch = false;
+                        foreach (var chp in checkednpc.HeadParts)
+                        {
+                            if (!dnpc.HeadParts.Contains(chp))
+                            {
+                                headpart_mismatch = true;
+                                break;
+                            }
+                        }
+                        if (headpart_mismatch) continue;
+                        // here, the headparts match, the name is the same, so they belong to the same collection
+                        dest_copies.AddRange(majorlist[j]);
+                        break;
+                    }
+                }
+                else dest_copies.Add(dnpc.FormKey);
+
+                //locate race appropriate swaps
+                //Log("begin locating correct race group");
+                var foxrace = FormKey.Factory("109C7C:Skyrim.esm");
+
+                // find a source that has correct race
+                var dnpc0 = state.LinkCache.Resolve<INpcGetter>(dest_copies[0]);
+                var dracefk = dnpc0.Race.FormKey;
+                string racename = "Other";
+                if (dracefk.Equals(foxrace))
+                {
+                    Log($"Foxrace for {dnpc0.FormKey}");
+                    continue;
+                }
+                foreach (var kvp in race_groups)
+                {
+                    if (kvp.Value.Contains(dracefk))
+                    {
+                        racename = kvp.Key;
+                        break;
+                    }
+                }
+                //Log($"npc {dnpc0.FormKey} racename was {racename}");
+                FormLink<INpcGetter> dsnpcfl;
+                if (racename == "Other")
+                {
+                    //Log($"npc {dnpc0} is being treated as Other");
+                }
+
+                
+                //Log("Check futa");
+                if (source_dict[racename].Count == 0)
+                {
+                    // choose a source from the main list
+                    dsnpcfl = source_list[inc];
+                    inc++;
+                }
+                else
+                {
+                    dsnpcfl = source_dict[racename][inc_dict[racename] % source_dict[racename].Count];
+                    inc_dict[racename]++;
+                }
+
+                var dg = dnpc.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female);
+                var sg = dsnpcfl.Resolve<INpcGetter>(state.LinkCache).Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female);
+
+                bool contains = Settings.Value.Futa_Settings.Futa_Choice_NPC.Contains(dnpcfl);
+                if (!dg && sg && (contains || Settings.Value.Futa_Settings.Set_Former_Males_as_Futa))
+                {
+                    int index = 0;
+                    ModKey sos_plug = new("Skyrim", ModType.Master);
+                    sbyte sos_size = -1;
+
+                    if (Settings.Value.Futa_Settings.Futa_Choice_NPC.Contains(dnpcfl))
+                    {
+                        index = Settings.Value.Futa_Settings.Futa_Choice_NPC.IndexOf(dnpcfl);
+
+                        sos_plug = Settings.Value.Futa_Settings.Futa_Choice_Addon[index];
+                        sos_size = (sbyte)Settings.Value.Futa_Settings.Futa_Choice_Size[index];
+                    }
+
+
+                    if (sos_size == -1)
+                    {
+                        if (Settings.Value.Futa_Settings.Futa_Size_randomization == 0)
+                        {
+                            sos_size = (sbyte)RandomNormal(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max);
+                        }
+                        else
+                        {
+                            sos_size = (sbyte)rnd.Next(Settings.Value.Futa_Settings.Futa_Size_Min, Settings.Value.Futa_Settings.Futa_Size_Max + 1);
+                        }
+                    }
+                    if (sos_plug.Name == "Skyrim")
+                    {
+                        sos_plug = Settings.Value.Futa_Settings.Futa_Addon_Plugins[rnd.Next(Settings.Value.Futa_Settings.Futa_Addon_Plugins.Count)];
+                    }
+                    //Log("create futa swap");
+                    foreach (var cdnpcfk in dest_copies)
+                    {
+                        var fl = new FormLink<INpcGetter>(cdnpcfk);
+                        if (map.Contains(new NPCSwap(fl, dsnpcfl, null))) continue;
+                        map.Add(new NPCSwap(fl, dsnpcfl, null, true, sos_plug, sos_size));
+                    }
+                }
+                else
+                {
+                    //Log("create normal swap");
+                    foreach (var cdnpcfk in dest_copies)
+                    {
+                        var fl = new FormLink<INpcGetter>(cdnpcfk);
+                        if (map.Contains(new NPCSwap(fl, dsnpcfl, null))) continue;
+                        map.Add(new NPCSwap(fl, dsnpcfl, null));
+                    }
+                }
+            }
         }
 
         private static ConcurrentDictionary<Npc, string> Swap_NPCs(HashSet<NPCSwap> npc_map)
@@ -1362,7 +1381,6 @@ namespace NPCFaceSwapper
                         }
                     }
                 }
-
             }
             if (Directory.Exists(modsfolder + @"\NPC Face Swap FaceGen\meshes")) Directory.Delete(modsfolder + @"\NPC Face Swap FaceGen\meshes", true);
             if (Directory.Exists(modsfolder + @"\NPC Face Swap FaceGen\textures")) Directory.Delete(modsfolder + @"\NPC Face Swap FaceGen\textures", true);
@@ -1386,9 +1404,9 @@ namespace NPCFaceSwapper
             var options = new ParallelOptions()
             {
                 //You can hard code the value as follows
-                MaxDegreeOfParallelism = 4
+                //MaxDegreeOfParallelism = 4
                 //But better to use the following statement
-                //MaxDegreeOfParallelism = Environment.ProcessorCount * 2 - 1
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 2 - 1
             };
             var swap_logs = new List<string>();
 
@@ -1404,7 +1422,7 @@ namespace NPCFaceSwapper
                 var logs = new List<string>();
                 var dnpc = swap.Dest_npc.Resolve<INpcGetter>(state!.LinkCache);
                 var tempNpc = dnpc.DeepCopy();
-                //Log($"{swap_count}/{npc_map.Count} Dest npc {tempNpc.EditorID} {tempNpc.FormKey.ModKey} {tempNpc.FormKey}");
+                Log($"{swap_count}/{npc_map.Count} Dest npc {tempNpc.EditorID} {tempNpc.FormKey.ModKey} {tempNpc.FormKey}");
 
                 Interlocked.Increment(ref swap_count);
 
@@ -1458,7 +1476,7 @@ namespace NPCFaceSwapper
                     foreach (var context in swap.Source_npc.ResolveAllContexts<ISkyrimMod, ISkyrimModGetter, INpc, INpcGetter>(state.LinkCache))
                     {
                         //find the record in the plugin we want
-                        if (context.ModKey != source_plugin) continue;
+                        if (!context.ModKey.Equals(source_plugin)) continue;
                         was_found = true;
                         desired_context = context;
                         break;
@@ -1472,7 +1490,7 @@ namespace NPCFaceSwapper
                 }
 
                 logs.Add($"The source EditorID is {desired_context.Record.EditorID} in mod {desired_context.ModKey} {desired_context.Record.FormKey}");
-
+                logs.Add($"Dest npc {tempNpc.EditorID} {tempNpc.FormKey.ModKey} {tempNpc.FormKey} swap from source {desired_context.Record.EditorID} in mod {desired_context.ModKey} {desired_context.Record.FormKey}");
                 //copy the records
                 //start with the last winning override of the dest npc
                 // head parts, hair color, head texture, texture lighting, face morph, face parts, tint layers, voice
@@ -1493,62 +1511,74 @@ namespace NPCFaceSwapper
                 tempNpc.FaceParts = snpc.FaceParts;
                 tempNpc.Race = snpc.Race;
 
-                if (tempNpc.Voice != snpc.Voice)
+
+                if (!Settings.Value.Voice_Settings.Use_Original_Voice)
                 {
-                    bool dest_voice_valid = tempNpc.Voice.TryResolve<IVoiceTypeGetter>(state.LinkCache, out var vt);
-                    bool source_voice_valid = snpc.Voice.TryResolve<IVoiceTypeGetter>(state.LinkCache, out var voice);
 
-                    //Log("check dest npc voice");
-                    if (tempNpc.Voice == null || !dest_voice_valid || vt == null)
+                    var source_voice_fl = snpc.Voice;
+                    bool source_voice_valid = source_voice_fl.TryResolve<IVoiceTypeGetter>(state.LinkCache, out var source_voice);
+
+                    string svt = "";
+
+                    if (Settings.Value.Voice_Settings.Use_Random_Voice ||
+                            !source_voice_valid ||
+                            source_voice == null ||
+                            !vanilla_skyrim.Contains(source_voice.FormKey.ModKey.ToString(), StringComparer.OrdinalIgnoreCase))
                     {
-                        logs.Add("\tVoice of dest npc is invalid, voice not needed");
-                    }
-
-                    //Log("check src npc voice");
-                    else if (snpc.Voice == null || !source_voice_valid || voice == null)
-                    {
-                        logs.Add("\tVoice of source is invalid, skipping voice");
-                    }
-                    else
-                    {
-                        string svt = voice.EditorID!.ToLower();
-
-                        if (xvasynth_model_names.ContainsKey(svt)) svt = xvasynth_model_names[svt];
-
-
-                        if (!vanilla_skyrim.Contains(voice.FormKey.ModKey.ToString(), StringComparer.OrdinalIgnoreCase))
+                        string v = "";
+                        if (snpc.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female))
                         {
-                            if (snpc.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female))
-                            {
-                                svt = voices_xvasynth_female[rnd.Next(0, voices_xvasynth_female.Count)];
-                                if (xvasynth_model_names.ContainsKey(svt)) svt = xvasynth_model_names[svt];
-                            }
-                            else
-                            {
-                                svt = voices_xvasynth_male[rnd.Next(0, voices_xvasynth_male.Count)];
-                                if (xvasynth_model_names.ContainsKey(svt)) svt = xvasynth_model_names[svt];
-                            }
-                        }
-
-                        changed_voices[tempNpc] = svt;
-
-                        //Log("check unique npc voice");
-                        if (vt!.EditorID!.Contains("unique", StringComparison.OrdinalIgnoreCase))
-                        {
-                            logs.Add("\tVoice has word unique, leaving record in place");
-                            //changed_voices.Add(tempNpc, voice);
-                        }
-                        //Log("check named npc voice");
-                        else if (tempNpc.Name != null && tempNpc.Name.String != null && vt.EditorID!.Contains(tempNpc.Name!.ToString().Split(" ")[0], StringComparison.OrdinalIgnoreCase))
-                        {
-                            logs.Add("\tVoice type contains npc name, leaving record in place");
-                            //changed_voices.Add(tempNpc, voice);
+                            v = xvasynth_model_names_female.Keys.ToList<string>()[rnd.Next(0, xvasynth_model_names_female.Count)];
                         }
                         else
                         {
-                            //changed_voices.Add(tempNpc, voice!);
-                            tempNpc.Voice = snpc.Voice!;
+                            v = xvasynth_model_names_male.Keys.ToList<string>()[rnd.Next(0, xvasynth_model_names_male.Count)];
+                        }
+                        source_voice = state.LinkCache.Resolve<IVoiceTypeGetter>(v);
+                        source_voice_fl = new FormLinkNullable<IVoiceTypeGetter>(source_voice.FormKey);
 
+                    }
+
+                    if (snpc.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female))
+                    {
+                        svt = xvasynth_model_names_female[source_voice.EditorID!.ToString()];
+                    }
+                    else
+                    {
+                        svt = xvasynth_model_names_male[source_voice.EditorID!.ToString()];
+                    }
+
+                    if (!tempNpc.Voice.Equals(source_voice_fl))
+                    {
+                        bool dest_voice_valid = tempNpc.Voice.TryResolve<IVoiceTypeGetter>(state.LinkCache, out var vt);
+
+                        if (tempNpc.Voice == null || !dest_voice_valid || vt == null)
+                        {
+                            logs.Add("\tVoice of dest npc is invalid, voice not needed");
+                        }
+                        else
+                        {
+                            changed_voices[tempNpc] = svt;
+
+                            //logs.Add("check unique npc voice");
+                            if (vt!.EditorID!.Contains("unique", StringComparison.OrdinalIgnoreCase) &&
+                                Settings.Value.Voice_Settings.Generate_Voice_CSV)
+                            {
+                                logs.Add("\tVoice has word unique, leaving record in place");
+                            }
+                            //logs.Add("check named npc voice");
+                            else if (tempNpc.Name != null &&
+                                tempNpc.Name.String != null &&
+                                vt.EditorID!.Contains(tempNpc.Name!.ToString().Split(" ")[0], StringComparison.OrdinalIgnoreCase) &&
+                                Settings.Value.Voice_Settings.Generate_Voice_CSV)
+                            {
+                                logs.Add("\tVoice type contains npc name, leaving record in place");
+                            }
+                            else
+                            {
+                                tempNpc.Voice = source_voice_fl;
+
+                            }
                         }
                     }
                 }
@@ -1558,9 +1588,11 @@ namespace NPCFaceSwapper
                     var addon = swap.Sos_plugin;
                     var ff = futa_addon_factions[addon];
 
-                    var rp = new RankPlacement();
-                    rp.Faction = new FormLink<IFactionGetter>(ff.FormKey);
-                    rp.Rank = swap.Sos_size;
+                    var rp = new RankPlacement
+                    {
+                        Faction = new FormLink<IFactionGetter>(ff.FormKey),
+                        Rank = swap.Sos_size
+                    };
 
                     tempNpc.Factions.Add(rp);
 
@@ -1604,10 +1636,10 @@ namespace NPCFaceSwapper
                 bool found_plugin = false;
                 foreach (var d in new DirectoryInfo(modsfolder).EnumerateDirectories())
                 {
-                    //Log(d.Name);
+                    //logs.Add(d.Name);
                     foreach (var f in d.EnumerateFiles())
                     {
-                        //Log($"\t{f.Name}");
+                        //logs.Add($"\t{f.Name}");
                         if (f.Name == desired_context.ModKey.FileName)
                         {
                             //logs.Add($"\tsearching for mod folder. esp {desired_context.ModKey.FileName} found? {f.Name} in {d.Name}");
@@ -1615,7 +1647,7 @@ namespace NPCFaceSwapper
                             int i = 0;
                             foreach (var line in modlist_lines)
                             {
-                                //Log(mline);
+                                //logs.Add(mline);
                                 if (line == "+"+ d.Name)
                                 {
 
@@ -1703,14 +1735,16 @@ namespace NPCFaceSwapper
             //no parallelism
             //Finished npc swaps 826856
 
+            //mdp 4
+            // Finished npc swaps 688298
+
             // mdp 7
             //Finished npc swaps 709459
-            // Finished npc swaps 688298
 
             // mdp 63
             //Finished npc swaps 724407
 
-            Log(swap_logs);
+            Log(swap_logs,false);
 
 
             return changed_voices;
@@ -1740,9 +1774,9 @@ namespace NPCFaceSwapper
             var options = new ParallelOptions()
             {
                 //You can hard code the value as follows
-                MaxDegreeOfParallelism = 7
+                //MaxDegreeOfParallelism = 7
                 //But better to use the following statement
-                //MaxDegreeOfParallelism = Environment.ProcessorCount*2 - 1
+                MaxDegreeOfParallelism = Environment.ProcessorCount*2 - 1
             };
             Stopwatch sw = new();
 

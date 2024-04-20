@@ -13,6 +13,8 @@ namespace NPCFaceSwapper
         [MaintainOrder]
         public PluginSettings Plugin_Settings = new();
         [MaintainOrder]
+        public RaceSettings Race_Settings = new();
+        [MaintainOrder]
         [SettingName("NPC Settings")]
         public NpcSettings Npc_Settings = new();
         [MaintainOrder]
@@ -45,6 +47,25 @@ namespace NPCFaceSwapper
         [SettingName("Destination Plugin Blacklist - Populate only whitelist or blacklist, not both")]
         public List<ModKey> dest_plugins_blacklist = new();
     }
+    public class RaceSettings
+    {
+        [MaintainOrder]
+        [SettingName("Source Race Blacklist - List of races to ignore as source")]
+        public List<IFormLinkGetter<IRaceGetter>> source_race_blacklist = new();
+        [MaintainOrder]
+        [SettingName("Destination Race Blacklist - List of races to ignore as destination")]
+        public List<IFormLinkGetter<IRaceGetter>> destination_race_blacklist = new();
+        [MaintainOrder]
+        [Tooltip("Allow only swaps between NPCs of the same race. Humans will swap between humans, elves between elves, argonians between argonians, and khajiit between khajiit.")]
+        public bool Use_Race_Based_Matching = false;
+        [MaintainOrder]
+        [Tooltip("Allow only swaps between NPCs which are human or elf, argonians between argonians, and khajiit between khajiit.")]
+        public bool Humanlike_Race_Matching = false;
+        [MaintainOrder]
+        [Tooltip("Allow only swaps between NPCs of the same race. Nords can only swap between nords, bretons between bretons, etc...")]
+        public bool Strict_Race_Matching = false;
+
+    }
     public class NpcSettings
     {
         [MaintainOrder]
@@ -68,9 +89,6 @@ namespace NPCFaceSwapper
         [SettingName("Destination Faction Blacklist - Populate only whitelist or blacklist, not both")]
         public List<IFormLinkGetter<IFactionGetter>> dest_fact_blacklist = new();
 
-        [MaintainOrder]
-        [SettingName("Race Blacklist - List of races to ignore")]
-        public List<IFormLinkGetter<IRaceGetter>> race_blacklist = new();
     }
     public class NpcSwapSettings
     { 
@@ -96,7 +114,7 @@ namespace NPCFaceSwapper
         [Tooltip("Allow some males to become female and some females to become female. Choice of gender swaps and their source faces will be random.")]
         public bool Randomize_Genders = false;
         [MaintainOrder]
-        [Tooltip("Changes faces between females/futas and/or changes faces between males")]
+        [Tooltip("Changes faces between females and/or changes faces between males")]
         public bool Randomize_Within_Genders = false;
 
     }
@@ -127,11 +145,19 @@ namespace NPCFaceSwapper
     public class VoiceSettings
     {
         [MaintainOrder]
-        [Tooltip("Generate voice files for gender changed/voice changed NPCs. Will use xVASynth, so the voices will sound computer generated, to some degree.\nLeave unchecked will leave some lines unvoiced, so you will need Fuz Ro Doh")]
+        [Tooltip("Generate voice files for gender changed NPCs. Will use xVASynth, so the voices will sound computer generated, to some degree.\nLeave unchecked will leave some lines unvoiced, so you will need Fuz Ro Doh")]
         public bool Generate_Voice_CSV=false;
         [MaintainOrder]
+        [Tooltip("Use the NPC's original voice regardless of gender. Select only this, only 'Generate Voice CSV' or neither to remove voices.")]
+        public bool Use_Original_Voice = false;
+        [MaintainOrder]
+        [Tooltip("Randomly select voice for gender changed NPCs.")]
+        public bool Use_Random_Voice = false;
+        [MaintainOrder]
+        [Ignore]
         public List<string> additional_xvasynth_female_models = new();
         [MaintainOrder]
+        [Ignore]
         public List<string> additional_xvasynth_male_models = new();
 
     }
