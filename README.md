@@ -16,6 +16,8 @@ Once the pairs have been created, the patcher will copy the current last overrid
 
 If the xVASynth option and the voice changer (not selecting original voice) option are both chosen, each of the destination NPCs will have their available spoken dialogue lines examined and repacked into a csv file that xVASynth can read and process.
 
+[xVASynth](https://www.nexusmods.com/skyrimspecialedition/mods/44184) available here, as well as vanilla skyrim voice type models.
+
 ## Requirements
 * For now, you need to be using MO2. Vortex support may come later.
 * All NPC overhaul plugins need to occupy the same mod folder as their facegen.
@@ -33,7 +35,10 @@ xVASynth generation will take a long time. For example, about 200k lines run on 
 * Non skyrim xVASynth model support
 
 ## Mod Recommendations
-Reserved for future mod/patcher recommendations.
+These are other mods or patchers that work well with NPC Face Swapper
+[SynArmorAAFix](https://github.com/TokcDK/SynArmorAAFixMissingGenderWorldModel)
+
+Please let me know if you think there's something that should go on this list
 
 ## Result
 The patcher will generate a new plugin and copy facegen into "NPC Face Swap FaceGen" in your MO2 mods folder. If you choose, it will also generate a batch csv in "NPC Face Swap VoiceGen" in your MO2 mods folder. The batch csv will automatically determine the sub path that the voice file needs to go into when it is generated, however in xVASynth you must choose to direct the output to "NPC Face Swap VoiceGen" or another mod if you so desire. Renaming and/or combining these mods should not be an issue.
@@ -48,6 +53,10 @@ Use the source NPC blacklist if there are some specific appearances you don't li
 Use the destination NPC blacklist if there are some characters you don't want to change. For example, Inigo or Lucien, since they are full of depth and are fully voiced.
 
 Use the race blacklist if you want to ignore certain races. For example Khajiit and Argonians or OldPeople races.
+
+Change the random generation seed if you run into NPC appearance generations that just doesn't quite work for you. Identical seeds with an identical modlist should result in an identical swap set.
+
+---
 
 ### Gender Settings
 
@@ -77,7 +86,7 @@ Select plugins to prevent NPC appearances to overwrite NPCs *originating* in plu
 ---
 
 ### Race Settings
-Whitelists and blacklists after this point are no longer mutually exclusive. NPCs listed in following whitelist will be included if not already, and NPCs listed in following blacklists will be removed if they were included prior.
+Whitelists and blacklists after this point are no longer mutually exclusive. NPCs listed in following whitelists will be included if not already, and NPCs listed in following blacklists will be removed if they were included prior.
 
 #### Source Race Blacklist
 Select a race whose NPCs should *not* be used to provide appearances.
@@ -110,7 +119,7 @@ Select factions whose NPCs are *not* to be changed.
 ---
 
 ### NPC Swap Settings
-Use these three lists in order to specify a specific appearance swap. You need to specify three things in order to make a swap: a destination NPC, a source NPC, a source Plugin which contains the source NPCs appearance data that is desired. It can even be one that is overwritten.
+Use these three lists in order to specify a specific appearance swap. You need to specify three things in order to make a swap: a destination NPC, a source NPC, a source Plugin which contains the source NPCs appearance data that is desired. It can even be one that is overwritten by other plugins.
 
 You will need to populate each list carefully. The n-th position in each list is correlated with each other, e.g. the 3rd NPC in the destination list will get their new appearance from the 3rd NPC in the source list as determined by the 3rd plugin in the source plugin list.
 
@@ -125,7 +134,7 @@ If you wish to turn all into futanari or want the selection to be random rather 
 #### Futa Size Randomization
 Select 0 for a normal distribution or select 1 for a uniform distribution of sizes.
 
-## Futa Choice settings
+### Futa Choice settings
 These three lists function the same as the NPC swap lists.
 
 The lists are provided make a specific schlong selection for a specific NPC. You will need to choose the NPC, the addon plugin, and the size (between 1 and 20).
@@ -153,4 +162,5 @@ For now, create an issue. For help, post your log.txt found in (Synthesis instal
 
 ## Changelog
 1.0.0 - Initial release
+
 1.1.0 - Updated readme, completed functionality on voice options, included race based npc filtering option
